@@ -5,9 +5,6 @@ import logging
 from dotenv import load_dotenv
 import os
 
-# =========================
-# SETUP
-# =========================
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -24,9 +21,6 @@ bot = commands.Bot(command_prefix='/', intents=intents)
 
 ROLE_NAME = "Mando Citizen"
 
-# =========================
-# RULES SENDER
-# =========================
 async def send_rules(bot):
     for guild in bot.guilds:
 
@@ -102,17 +96,11 @@ async def send_rules(bot):
         await channel.send(embed=embed)
         print("✅ Rules message sent")
 
-# =========================
-# READY
-# =========================
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     await send_rules(bot)
 
-# =========================
-# AUTO ROLE
-# =========================
 @bot.event
 async def on_member_join(member):
     role = discord.utils.get(member.guild.roles, name=ROLE_NAME)
@@ -123,10 +111,6 @@ async def on_member_join(member):
             print(f"✅ Gave role to {member.name}")
         except Exception as e:
             print(f"❌ Role error: {e}")
-
-# =========================
-# TICKET SYSTEM
-# =========================
 
 TICKET_CATEGORIES = [
     "Support",
@@ -224,9 +208,6 @@ class CloseTicketView(View):
         await interaction.response.send_message("🔒 Closing ticket...", ephemeral=True)
         await channel.delete()
 
-# =========================
-# CREATE PANEL COMMAND
-# =========================
 @bot.command(name="ticketpanel")
 @commands.has_permissions(administrator=True)
 async def ticket_panel(ctx):
@@ -238,7 +219,4 @@ async def ticket_panel(ctx):
 
     await ctx.send(embed=embed, view=TicketView())
 
-# =========================
-# RUN
-# =========================
 bot.run(TOKEN, log_handler=handler, log_level=logging.INFO)
