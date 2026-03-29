@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import asyncio
+from discord import app_commands
 from utils.database import get_db
 
 LINKED_ROLE = "Linked"
@@ -10,68 +10,104 @@ class Link(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="link")
-    async def link(self, ctx, code: str):
-
-        try:
-            await ctx.message.delete()
-        except:
-            pass
-
-        code = code.upper()
+    # =========================
+    # SLASH COMMAND
+    # =========================
+    @app_commands.command(name="link", description="Link or check your Minecraft account")
+    @app_commands.describe(code="Your Minecraft link code (optional)")
+    async def link(self, interaction: discord.Interaction, code: str = None):
 
         try:
             conn = get_db()
             cursor = conn.cursor(dictionary=True)
 
-            # Prevent duplicate linking
+            # =========================
+            # CHECK IF ALREADY LINKED
+            # =========================
             cursor.execute(
                 "SELECT * FROM links WHERE discord_id = %s AND linked = TRUE",
-                (str(ctx.author.id),)
+                (str(interaction.user.id),)
             )
+            existing = cursor.fetchone()
 
-            if cursor.fetchone():
-                msg = await ctx.send("❌ Your Discord account is already linked.")
-                await asyncio.sleep(5)
-                await msg.delete()
+            # =========================
+            # NO CODE → STATUS CHECK
+            # =========================
+            if code is None:
+                if existing:
+                    await interaction.response.send_message(
+                        "✅ Your Discord account is already linked.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.response.send_message(
+                        "❌ You are not linked. Use `/link CODE`.",
+                        ephemeral=True
+                    )
                 return
 
-            # Check code
-            cursor.execute("SELECT * FROM links WHERE link_code = %s", (code,))
+            code = code.upper()
+
+            # =========================
+            # BLOCK DOUBLE LINKING
+            # =========================
+            if existing:
+                await interaction.response.send_message(
+                    "❌ Your Discord account is already linked.",
+                    ephemeral=True
+                )
+                return
+
+            # =========================
+            # CHECK CODE
+            # =========================
+            cursor.execute(
+                "SELECT * FROM links WHERE link_code = %s",
+                (code,)
+            )
             result = cursor.fetchone()
 
             if not result:
-                msg = await ctx.send("❌ Invalid or expired code.")
-                await asyncio.sleep(5)
-                await msg.delete()
+                await interaction.response.send_message(
+                    "❌ Invalid or expired code.",
+                    ephemeral=True
+                )
                 return
 
             if result["linked"]:
-                msg = await ctx.send("❌ This code has already been used.")
-                await asyncio.sleep(5)
-                await msg.delete()
+                await interaction.response.send_message(
+                    "❌ This code has already been used.",
+                    ephemeral=True
+                )
                 return
 
-            # Update DB
+            # =========================
+            # UPDATE DB
+            # =========================
             cursor.execute(
                 "UPDATE links SET discord_id = %s, linked = TRUE WHERE link_code = %s",
-                (str(ctx.author.id), code)
+                (str(interaction.user.id), code)
             )
             conn.commit()
 
-            role = discord.utils.get(ctx.guild.roles, name=LINKED_ROLE)
+            # =========================
+            # GIVE ROLE
+            # =========================
+            role = discord.utils.get(interaction.guild.roles, name=LINKED_ROLE)
             if role:
-                await ctx.author.add_roles(role)
+                await interaction.user.add_roles(role)
 
-            msg = await ctx.send("✅ Successfully linked your account!")
-            await asyncio.sleep(5)
-            await msg.delete()
+            await interaction.response.send_message(
+                "✅ Successfully linked your account!",
+                ephemeral=True
+            )
 
         except Exception as e:
             print(e)
-            msg = await ctx.send("❌ Error linking your account.")
-            await asyncio.sleep(5)
-            await msg.delete()
+            await interaction.response.send_message(
+                "❌ Error linking your account.",
+                ephemeral=True
+            )
 
         finally:
             try:
@@ -79,6 +115,7 @@ class Link(commands.Cog):
                 conn.close()
             except:
                 pass
+
 
 async def setup(bot):
     await bot.add_cog(Link(bot))

@@ -1,4 +1,5 @@
 from discord.ext import commands, tasks
+from discord import app_commands
 from mcstatus import JavaServer
 import discord
 
@@ -35,7 +36,7 @@ class Server(commands.Cog):
             )
 
         except Exception as e:
-            print(e)
+            print("Status error:", e)
             await self.bot.change_presence(
                 activity=discord.Activity(
                     type=discord.ActivityType.watching,
@@ -48,21 +49,24 @@ class Server(commands.Cog):
         await self.bot.wait_until_ready()
 
     # =========================
-    # COMMAND
+    # SLASH COMMAND
     # =========================
-    @commands.command(name="players")
-    async def players(self, ctx):
+    @app_commands.command(name="players", description="View online player count")
+    async def players(self, interaction: discord.Interaction):
         try:
             server = JavaServer.lookup(SERVER_IP)
             status = server.status()
 
             text = self.format_players(status.players.online)
 
-            await ctx.send(f"👥 {text}")
+            await interaction.response.send_message(f"👥 {text}")
 
         except Exception as e:
-            await ctx.send("❌ Server offline.")
-            print(e)
+            print("Command error:", e)
+            await interaction.response.send_message(
+                "❌ Server offline.",
+                ephemeral=True
+            )
 
 
 async def setup(bot):
